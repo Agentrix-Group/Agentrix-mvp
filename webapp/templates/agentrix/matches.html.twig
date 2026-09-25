@@ -1,0 +1,231 @@
+{% extends "agentrix/base.html.twig" %}
+
+{% block title %}Partidas Arena - {{ parent() }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h1 class="mb-1">
+                <i class="fas fa-robot text-primary me-2"></i> Agentrix AI Arena
+            </h1>
+            <p class="text-muted mb-0">
+                Torneo de Bots Autónomos &middot; Concurso: <strong>{{ contest ? contest.name : 'Sin concurso activo' }}</strong>
+            </p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{{ path('agentrix_ranking') }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-trophy me-1"></i> Ver Ranking Oficial
+            </a>
+            {% if is_granted('ROLE_JURY') %}
+                <form action="{{ path('agentrix_round_schedule') }}" method="POST" onsubmit="return confirm('¿Deseas programar una nueva ronda de partidas con los bots válidos actuales?');">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus-circle me-1"></i> Programar Nueva Ronda
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Status Summary Cards #}
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <a href="{{ path('agentrix_matches', {status: 'all', round: roundFilter}) }}" class="text-decoration-none">
+                <div class="card summary-stat-card p-3 text-center {% if statusFilter == 'all' %}border-primary shadow-sm{% endif %}">
+                    <div class="stat-label">Total Partidas</div>
+                    <div class="stat-value text-dark">{{ statusCounts.all }}</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ path('agentrix_matches', {status: 'queued', round: roundFilter}) }}" class="text-decoration-none">
+                <div class="card summary-stat-card p-3 text-center {% if statusFilter == 'queued' %}border-warning shadow-sm{% endif %}">
+                    <div class="stat-label">En Cola</div>
+                    <div class="stat-value text-warning">{{ statusCounts.queued }}</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ path('agentrix_matches', {status: 'finished', round: roundFilter}) }}" class="text-decoration-none">
+                <div class="card summary-stat-card p-3 text-center {% if statusFilter == 'finished' %}border-success shadow-sm{% endif %}">
+                    <div class="stat-label">Finalizadas</div>
+                    <div class="stat-value text-success">{{ statusCounts.finished }}</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ path('agentrix_matches', {status: 'failed', round: roundFilter}) }}" class="text-decoration-none">
+                <div class="card summary-stat-card p-3 text-center {% if statusFilter == 'failed' %}border-danger shadow-sm{% endif %}">
+                    <div class="stat-label">Fallidas</div>
+                    <div class="stat-value text-danger">{{ statusCounts.failed }}</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    {# Filter Toolbar #}
+    <div class="card mb-3">
+        <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-1 flex-wrap">
+                <span class="text-muted small fw-bold me-2"><i class="fas fa-filter"></i> ESTADO:</span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <a href="{{ path('agentrix_matches', {status: 'all', round: roundFilter}) }}"
+                       class="btn {% if statusFilter == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                        Todos ({{ statusCounts.all }})
+                    </a>
+                    <a href="{{ path('agentrix_matches', {status: 'queued', round: roundFilter}) }}"
+                       class="btn {% if statusFilter == 'queued' %}btn-warning text-dark{% else %}btn-outline-secondary{% endif %}">
+                        En cola ({{ statusCounts.queued }})
+                    </a>
+                    <a href="{{ path('agentrix_matches', {status: 'running', round: roundFilter}) }}"
+                       class="btn {% if statusFilter == 'running' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        En ejecución ({{ statusCounts.running }})
+                    </a>
+                    <a href="{{ path('agentrix_matches', {status: 'finished', round: roundFilter}) }}"
+                       class="btn {% if statusFilter == 'finished' %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                        Finalizadas ({{ statusCounts.finished }})
+                    </a>
+                    {% if statusCounts.failed > 0 %}
+                        <a href="{{ path('agentrix_matches', {status: 'failed', round: roundFilter}) }}"
+                           class="btn {% if statusFilter == 'failed' %}btn-danger{% else %}btn-outline-secondary{% endif %}">
+                            Fallidas ({{ statusCounts.failed }})
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if availableRounds|length > 1 %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted small fw-bold"><i class="fas fa-layer-group"></i> RONDA:</span>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ path('agentrix_matches', {status: statusFilter, round: 'all'}) }}"
+                           class="btn {% if roundFilter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                            Todas
+                        </a>
+                        {% for r in availableRounds %}
+                            <a href="{{ path('agentrix_matches', {status: statusFilter, round: r}) }}"
+                               class="btn {% if roundFilter == r ~ '' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                                R{{ r }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Matches Table #}
+    <div class="card mb-4">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 70px;">ID</th>
+                        <th style="width: 140px;">Ronda / Semilla</th>
+                        <th style="width: 130px;">Estado</th>
+                        <th>Participantes (5 Bots)</th>
+                        <th style="width: 150px;">Duración</th>
+                        <th style="width: 160px; text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for match in matches %}
+                        <tr>
+                            <td class="align-middle">
+                                <strong>#{{ match.matchid }}</strong>
+                            </td>
+                            <td class="align-middle">
+                                <div><strong>Ronda {{ match.round }}</strong></div>
+                                <div class="small text-muted">Semilla: <code>{{ match.seed }}</code></div>
+                            </td>
+                            <td class="align-middle">
+                                {% if match.status == 'queued' %}
+                                    <span class="badge text-bg-secondary">
+                                        <i class="fas fa-clock"></i> En cola
+                                    </span>
+                                {% elseif match.status == 'running' %}
+                                    <span class="badge text-bg-primary">
+                                        <i class="fas fa-spinner fa-spin"></i> Simulando
+                                    </span>
+                                {% elseif match.status == 'finished' %}
+                                    <span class="badge text-bg-success">
+                                        <i class="fas fa-check-circle"></i> Finalizada
+                                    </span>
+                                {% else %}
+                                    <span class="badge text-bg-danger" title="{{ match.errorMessage }}">
+                                        <i class="fas fa-exclamation-triangle"></i> Fallida
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                <div class="d-flex flex-wrap align-items-center">
+                                    {% for p in match.participants %}
+                                        {% set colors = ['#0072ed', '#e86151', '#0a8927', '#e09f3e', '#9b5de5'] %}
+                                        {% set botColor = colors[p.seat % 5] %}
+                                        <div class="bot-pill" title="Asiento {{ p.seat + 1 }}: Equipo {{ p.team.name }} {% if p.place %}(Puesto {{ p.place }}º · {{ p.kills|default(0) }} kills){% endif %}">
+                                            <span class="bot-color-dot" style="background-color: {{ botColor }};"></span>
+                                            <span class="fw-semibold">{{ p.team.name }}</span>
+                                            {% if match.status == 'finished' and p.place %}
+                                                {% if p.place == 1 %}
+                                                    <span class="badge bg-warning text-dark px-1 ms-1">🥇 1º</span>
+                                                {% else %}
+                                                    <span class="badge bg-light text-muted border px-1 ms-1">{{ p.place }}º</span>
+                                                {% endif %}
+                                                <small class="text-muted ms-1">({{ p.kills|default(0) }}k)</small>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td class="align-middle">
+                                {% if match.finishedAt and match.startedAt %}
+                                    {% set durationSec = match.finishedAt.timestamp - match.startedAt.timestamp %}
+                                    <div>{{ durationSec }}s real</div>
+                                    <div class="small text-muted">{{ match.finishedAt|date('H:i:s') }}</div>
+                                {% elseif match.replay %}
+                                    <div>{{ match.replay.ticks }} ticks</div>
+                                    <div class="small text-muted">{{ (match.replay.durationSeconds)|round(1) }}s sim</div>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center align-middle">
+                                <div class="d-inline-flex gap-1">
+                                    {% if match.status == 'finished' %}
+                                        <a href="{{ path('agentrix_match_replay', {matchId: match.matchid}) }}"
+                                           class="btn btn-sm btn-primary" title="Ver Repetición Interactiva">
+                                            <i class="fas fa-play me-1"></i> Replay
+                                        </a>
+                                    {% endif %}
+                                    {% if is_granted('ROLE_JURY') and (match.status == 'failed' or match.status == 'running') %}
+                                        <form action="{{ path('agentrix_match_retry', {matchId: match.matchid}) }}" method="POST"
+                                              onsubmit="return confirm('¿Reiniciar la partida #{{ match.matchid }} a la cola?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Reiniciar Partida">
+                                                <i class="fas fa-redo"></i>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fas fa-ghost fa-3x mb-3 text-secondary d-block"></i>
+                                <h5>No se encontraron partidas con los filtros seleccionados</h5>
+                                <p class="mb-0">
+                                    {% if is_granted('ROLE_JURY') %}
+                                        Puedes programar una nueva ronda haciendo clic en <strong>Programar Nueva Ronda</strong>.
+                                    {% else %}
+                                        El jurado programará las partidas tan pronto como se envíen bots válidos.
+                                    {% endif %}
+                                </p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

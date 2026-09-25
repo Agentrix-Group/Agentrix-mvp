@@ -652,8 +652,9 @@ class SubmissionService
             }
         }
 
-        if ($totalSize > $sourceSize * 1024) {
-            $message = sprintf("Submission file(s) are larger than %d kB.", $sourceSize);
+        $maxAllowedSize = ($language->getLangid() === 'zip') ? max($sourceSize, 102400) : $sourceSize;
+        if ($totalSize > $maxAllowedSize * 1024) {
+            $message = sprintf("Submission file(s) are larger than %d kB.", $maxAllowedSize);
             if ($forceImportInvalid || $source === SubmissionSource::SHADOWING) {
                 $importError = $message;
             } else {

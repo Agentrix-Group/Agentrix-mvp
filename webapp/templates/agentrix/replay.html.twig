@@ -1,0 +1,718 @@
+{% extends "agentrix/base.html.twig" %}
+
+{% block title %}Repetición Partida #{{ match.matchid }} - {{ parent() }}{% endblock %}
+
+{% block extrahead %}
+    {{ parent() }}
+    <style>
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            background: #0d1719;
+            border-radius: 6px 6px 0 0;
+            overflow: hidden;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+        }
+
+        #arenaCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1200 / 750;
+            cursor: crosshair;
+        }
+
+        .controls-toolbar {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            padding: 0.6rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .scrubber-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #dee2e6;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .scrubber-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #0072ed;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s;
+        }
+
+        .scrubber-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+        }
+
+        .btn-replay {
+            background: #ffffff;
+            color: #495057;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 0.35rem 0.7rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-replay:hover {
+            background: #e9ecef;
+            color: #212529;
+            border-color: #adb5bd;
+        }
+
+        .btn-replay.active {
+            background: #0072ed;
+            color: #ffffff;
+            border-color: #0072ed;
+        }
+
+        .bot-card {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 0.6rem 0.8rem;
+            margin-bottom: 0.5rem;
+            transition: background 0.15s ease;
+        }
+
+        .bot-card.dead {
+            opacity: 0.6;
+            background: #f8f9fa;
+            border-color: #e9ecef;
+        }
+
+        .bot-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.3rem;
+        }
+
+        .bot-card-name {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: #212529;
+            font-size: 0.9rem;
+        }
+
+        .bar-container {
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+
+        .bar-hp {
+            height: 100%;
+            background: #0a8927;
+            transition: width 0.1s linear, background-color 0.2s;
+        }
+
+        .bar-xp {
+            height: 100%;
+            background: #ffc107;
+            transition: width 0.1s linear;
+        }
+
+        .battle-log {
+            max-height: 250px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 0.5rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .log-entry {
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            background: #ffffff;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            border-left: 3px solid #6c757d;
+        }
+
+        .log-entry.kill {
+            border-left-color: #dc3545;
+            color: #721c24;
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .log-entry.start {
+            border-left-color: #0072ed;
+            color: #004085;
+            background: #cce5ff;
+            border-color: #b8daff;
+        }
+
+        .log-time {
+            color: #6c757d;
+            margin-right: 0.4rem;
+            font-weight: bold;
+        }
+
+        .canvas-overlay-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.97);
+            border: 1px solid #dee2e6;
+            padding: 1.5rem 2rem;
+            border-radius: 8px;
+            text-align: center;
+            color: #212529;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {# Header Navigation #}
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ path('agentrix_matches') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Partidas
+            </a>
+            <h1 class="h4 mb-0 fw-bold">
+                <i class="fas fa-play-circle text-primary me-2"></i>
+                Repetición: Partida #{{ match.matchid }}
+            </h1>
+            <span class="badge text-bg-secondary">Ronda {{ match.round }}</span>
+            <span class="badge text-bg-light border text-muted">Semilla: {{ match.seed }}</span>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ path('agentrix_ranking') }}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-trophy me-1"></i> Ranking General
+            </a>
+            <a href="{{ replayDataUrl }}" download="match_{{ match.matchid }}.json" class="btn btn-sm btn-outline-secondary" title="Descargar datos en bruto">
+                <i class="fas fa-download me-1"></i> JSON
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        {# Left: Canvas + Controls #}
+        <div class="col-lg-8 col-xl-9">
+            <div class="canvas-wrapper">
+                <canvas id="arenaCanvas" width="1200" height="750"></canvas>
+                <div id="loadingOverlay" class="canvas-overlay-msg">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <div class="fw-bold fs-5">Descargando repetición...</div>
+                    <div class="small text-muted mt-1">Descomprimiendo fotogramas de alta frecuencia (60 FPS)</div>
+                </div>
+                <div id="winnerOverlay" class="canvas-overlay-msg" style="display: none; border-color: #ffc107;">
+                    <div class="fs-1 mb-2">🏆</div>
+                    <h3 class="fw-bold mb-1 text-dark" id="winnerName">Ganador</h3>
+                    <div class="text-muted mb-3" id="winnerStats">Estadísticas de la partida</div>
+                    <button class="btn btn-primary btn-sm me-2" onclick="restartReplay()">
+                        <i class="fas fa-redo me-1"></i> Ver de nuevo
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('winnerOverlay').style.display='none'">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+
+            {# Controls Toolbar #}
+            <div class="controls-toolbar">
+                {# Play/Pause & Step Buttons #}
+                <div class="d-flex align-items-center gap-1">
+                    <button id="btnPlayPause" class="btn-replay" title="Reproducir / Pausar (Espacio)" style="width: 44px; height: 38px;">
+                        <i class="fas fa-play" id="iconPlayPause"></i>
+                    </button>
+                    <button id="btnStepBack" class="btn-replay" title="Retroceder 1s (Flecha Izq)">
+                        <i class="fas fa-backward"></i>
+                    </button>
+                    <button id="btnStepForward" class="btn-replay" title="Avanzar 1s (Flecha Der)">
+                        <i class="fas fa-forward"></i>
+                    </button>
+                </div>
+
+                {# Time & Tick Indicator #}
+                <div class="d-flex flex-column" style="min-width: 140px;">
+                    <span id="timeDisplay" class="fw-bold text-dark fs-6">00:00 / 00:00</span>
+                    <span id="tickDisplay" class="small text-muted" style="font-size: 0.75rem;">Tick 0 / 0</span>
+                </div>
+
+                {# Scrubber Slider #}
+                <div class="flex-grow-1 mx-2">
+                    <input type="range" id="timelineScrubber" class="scrubber-slider" min="0" max="100" value="0">
+                </div>
+
+                {# Speed Selection #}
+                <div class="d-flex align-items-center gap-1">
+                    <span class="small text-muted me-1 fw-bold">VEL:</span>
+                    <button class="btn-replay btn-sm speed-btn" data-speed="0.5">0.5x</button>
+                    <button class="btn-replay btn-sm speed-btn active" data-speed="1">1x</button>
+                    <button class="btn-replay btn-sm speed-btn" data-speed="2">2x</button>
+                    <button class="btn-replay btn-sm speed-btn" data-speed="4">4x</button>
+                </div>
+            </div>
+        </div>
+
+        {# Right: Live Bots Status & Combat Log #}
+        <div class="col-lg-4 col-xl-3">
+            {# Bots Status Cards #}
+            <div class="card mb-3">
+                <div class="card-header font-weight-bold d-flex justify-content-between align-items-center py-2 px-3">
+                    <span><i class="fas fa-users me-1 text-primary"></i> Estado de Bots</span>
+                    <span id="aliveCount" class="badge bg-success">5 / 5 en pie</span>
+                </div>
+                <div class="card-body p-2" id="botsCardsContainer">
+                    {# Dynamic bot cards #}
+                </div>
+            </div>
+
+            {# Combat Event Log #}
+            <div class="card">
+                <div class="card-header font-weight-bold d-flex justify-content-between align-items-center py-2 px-3">
+                    <span><i class="fas fa-list-alt me-1 text-secondary"></i> Registro de Combate</span>
+                    <span class="small text-muted" id="eventsCount">0 eventos</span>
+                </div>
+                <div class="card-body p-2">
+                    <div class="battle-log" id="battleLog">
+                        {# Dynamic events #}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const REPLAY_DATA_URL = "{{ replayDataUrl }}";
+        const W = 1200, H = 750, FPS = 60, DT = 1 / FPS;
+
+        const canvas = document.getElementById('arenaCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const winnerOverlay = document.getElementById('winnerOverlay');
+        const winnerNameEl = document.getElementById('winnerName');
+        const winnerStatsEl = document.getElementById('winnerStats');
+        const btnPlayPause = document.getElementById('btnPlayPause');
+        const iconPlayPause = document.getElementById('iconPlayPause');
+        const btnStepBack = document.getElementById('btnStepBack');
+        const btnStepForward = document.getElementById('btnStepForward');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const tickDisplay = document.getElementById('tickDisplay');
+        const timelineScrubber = document.getElementById('timelineScrubber');
+        const botsCardsContainer = document.getElementById('botsCardsContainer');
+        const battleLog = document.getElementById('battleLog');
+        const aliveCountEl = document.getElementById('aliveCount');
+        const eventsCountEl = document.getElementById('eventsCount');
+
+        let replayData = null;
+        let frames = [];
+        let totalFrames = 0;
+        let currentFrameIdx = 0;
+        let isPlaying = false;
+        let playbackSpeed = 1.0;
+        let lastTimestamp = performance.now();
+        let frameAccumulator = 0;
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        async function initReplay() {
+            try {
+                const response = await fetch(REPLAY_DATA_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                }
+                replayData = await response.json();
+                frames = replayData.frames || [];
+                totalFrames = frames.length;
+
+                if (totalFrames === 0) {
+                    loadingOverlay.innerHTML = '<div class="text-danger fw-bold">Error: Repetición vacía (0 fotogramas).</div>';
+                    return;
+                }
+
+                timelineScrubber.max = totalFrames - 1;
+                timelineScrubber.value = 0;
+                loadingOverlay.style.display = 'none';
+
+                // Initial render
+                renderFrame(0);
+                play();
+                requestAnimationFrame(gameLoop);
+            } catch (err) {
+                console.error("Error cargando repetición:", err);
+                loadingOverlay.innerHTML = `<div class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> No se pudo cargar la repetición.</div><div class="small text-muted mt-2">${err.message}</div>`;
+            }
+        }
+
+        function play() {
+            if (currentFrameIdx >= totalFrames - 1) {
+                currentFrameIdx = 0;
+                winnerOverlay.style.display = 'none';
+            }
+            isPlaying = true;
+            iconPlayPause.className = 'fas fa-pause';
+            lastTimestamp = performance.now();
+            frameAccumulator = 0;
+        }
+
+        function pause() {
+            isPlaying = false;
+            iconPlayPause.className = 'fas fa-play';
+        }
+
+        function togglePlayPause() {
+            if (isPlaying) pause(); else play();
+        }
+
+        window.restartReplay = function() {
+            currentFrameIdx = 0;
+            winnerOverlay.style.display = 'none';
+            play();
+        };
+
+        function gameLoop(timestamp) {
+            const elapsed = Math.min(0.2, (timestamp - lastTimestamp) / 1000);
+            lastTimestamp = timestamp;
+
+            if (isPlaying && totalFrames > 0) {
+                frameAccumulator += elapsed * playbackSpeed;
+                const framesToAdvance = Math.floor(frameAccumulator / DT);
+                if (framesToAdvance > 0) {
+                    frameAccumulator -= framesToAdvance * DT;
+                    currentFrameIdx += framesToAdvance;
+                    if (currentFrameIdx >= totalFrames - 1) {
+                        currentFrameIdx = totalFrames - 1;
+                        pause();
+                        showWinner();
+                    }
+                    timelineScrubber.value = currentFrameIdx;
+                    renderFrame(currentFrameIdx);
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function renderFrame(idx) {
+            if (!frames[idx]) return;
+            const frame = frames[idx];
+
+            drawArena(frame);
+
+            const currentTimeSec = frame.time;
+            const totalTimeSec = frames[totalFrames - 1].time;
+            timeDisplay.textContent = `${formatTime(currentTimeSec)} / ${formatTime(totalTimeSec)}`;
+            tickDisplay.textContent = `Tick ${frame.tick} / ${frames[totalFrames - 1].tick}`;
+
+            updateBotsCards(frame.players);
+            updateEventLog(frame.tick);
+        }
+
+        function drawArena(frame) {
+            ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+
+            ctx.fillStyle = '#0d1719';
+            ctx.fillRect(0, 0, W, H);
+
+            ctx.strokeStyle = '#15252a';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 50; x < W; x += 50) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+            for (let y = 50; y < H; y += 50) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+            ctx.stroke();
+
+            if (replayData.config?.match_rules?.zone && frame.zone_radius < Math.hypot(W, H) / 2) {
+                ctx.beginPath();
+                ctx.rect(0, 0, W, H);
+                ctx.arc(W / 2, H / 2, Math.max(0, frame.zone_radius), 0, Math.PI * 2, true);
+                ctx.fillStyle = 'rgba(232, 120, 74, 0.14)';
+                ctx.fill('evenodd');
+
+                ctx.strokeStyle = '#e8b04a';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 8]);
+                ctx.beginPath();
+                ctx.arc(W / 2, H / 2, Math.max(0, frame.zone_radius), 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            if (replayData.walls) {
+                for (const w of replayData.walls) {
+                    ctx.fillStyle = '#26393e';
+                    ctx.fillRect(w.x, w.y, w.w, w.h);
+                    ctx.strokeStyle = '#4a6c75';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(w.x, w.y, w.w, w.h);
+                }
+            }
+
+            if (frame.mobs) {
+                for (const m of frame.mobs) {
+                    ctx.save();
+                    ctx.translate(m.pos.x, m.pos.y);
+                    ctx.rotate(m.facing);
+                    ctx.fillStyle = '#b9704f';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#2a1510';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(12, 0);
+                    ctx.stroke();
+                    ctx.restore();
+
+                    if (m.hp < m.max_hp) {
+                        const hpPct = Math.max(0, Math.min(1, m.hp / m.max_hp));
+                        ctx.fillStyle = '#081215';
+                        ctx.fillRect(m.pos.x - 11, m.pos.y - 18, 22, 5);
+                        ctx.fillStyle = '#e0866a';
+                        ctx.fillRect(m.pos.x - 10, m.pos.y - 17, 20 * hpPct, 3);
+                    }
+                }
+            }
+
+            if (frame.bullets) {
+                for (const b of frame.bullets) {
+                    ctx.fillStyle = b.color || '#fff';
+                    ctx.beginPath();
+                    ctx.arc(b.pos.x, b.pos.y, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            if (frame.players) {
+                for (const p of frame.players) {
+                    const { x, y } = p.pos;
+
+                    if (!p.alive) {
+                        ctx.strokeStyle = p.color;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(x - 9, y - 9); ctx.lineTo(x + 9, y + 9);
+                        ctx.moveTo(x + 9, y - 9); ctx.lineTo(x - 9, y + 9);
+                        ctx.stroke();
+                        continue;
+                    }
+
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#061012';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(p.facing) * 20, y + Math.sin(p.facing) * 20);
+                    ctx.stroke();
+
+                    ctx.font = 'bold 12px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#061012';
+                    ctx.fillText(p.level, x, y);
+
+                    const hpRatio = Math.max(0, Math.min(1, p.hp / p.max_hp));
+                    ctx.fillStyle = '#081215';
+                    ctx.fillRect(x - 19, y - 26, 38, 6);
+                    ctx.fillStyle = hpRatio > 0.35 ? '#00e676' : '#ff5252';
+                    ctx.fillRect(x - 18, y - 25, 36 * hpRatio, 4);
+
+                    const xpRatio = Math.max(0, Math.min(1, p.xp / p.xp_next));
+                    ctx.fillStyle = '#081215';
+                    ctx.fillRect(x - 19, y - 19, 38, 4);
+                    ctx.fillStyle = '#ffb300';
+                    ctx.fillRect(x - 18, y - 18, 36 * xpRatio, 2);
+
+                    ctx.font = '600 11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(p.name, x, y + 18);
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        function updateBotsCards(players) {
+            if (!players) return;
+            const alivePlayers = players.filter(p => p.alive);
+            aliveCountEl.textContent = `${alivePlayers.length} / ${players.length} en pie`;
+            aliveCountEl.className = alivePlayers.length > 1 ? 'badge bg-success' : 'badge bg-warning text-dark';
+
+            botsCardsContainer.innerHTML = players.map(p => {
+                const hpPct = Math.max(0, Math.min(100, Math.round((p.hp / p.max_hp) * 100)));
+                const xpPct = Math.max(0, Math.min(100, Math.round((p.xp / p.xp_next) * 100)));
+                const hpColor = hpPct > 35 ? '#0a8927' : '#dc3545';
+
+                return `
+                    <div class="bot-card ${p.alive ? '' : 'dead'}">
+                        <div class="bot-card-header">
+                            <div class="bot-card-name">
+                                <span class="bot-color-dot" style="background-color: ${p.color}; width: 12px; height: 12px;"></span>
+                                <span>${escapeHtml(p.name)}</span>
+                            </div>
+                            <div>
+                                ${p.alive ? 
+                                    '<span class="badge bg-success px-1" style="font-size: 0.7rem;">VIVO</span>' : 
+                                    `<span class="badge bg-danger px-1" style="font-size: 0.7rem;">MUERTO (${formatTime(p.death_tick / 60)})</span>`}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted mb-1" style="font-size: 0.75rem;">
+                            <span>HP: <strong style="color: ${hpColor};">${Math.ceil(p.hp)}</strong> / ${Math.round(p.max_hp)}</span>
+                            <span>Nv ${p.level} &middot; Kills: <strong class="text-primary">${p.kills}</strong> (${p.mob_kills}m)</span>
+                        </div>
+                        <div class="bar-container mb-1">
+                            <div class="bar-hp" style="width: ${hpPct}%; background-color: ${hpColor};"></div>
+                        </div>
+                        <div class="bar-container" style="height: 3px;">
+                            <div class="bar-xp" style="width: ${xpPct}%;"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateEventLog(currentTick) {
+            const allEvents = replayData.frames[totalFrames - 1]?.events || [];
+            const pastEvents = allEvents.filter(e => e.tick <= currentTick);
+            eventsCountEl.textContent = `${pastEvents.length} eventos`;
+
+            battleLog.innerHTML = pastEvents.map(e => {
+                const isKill = e.text.includes('eliminó') || e.text.includes('murió');
+                const isStart = e.text.includes('iniciada');
+                const typeClass = isKill ? 'kill' : (isStart ? 'start' : '');
+                return `
+                    <div class="log-entry ${typeClass}">
+                        <span class="log-time">${formatTime(e.tick / 60)}</span>
+                        <span>${escapeHtml(e.text)}</span>
+                    </div>
+                `;
+            }).reverse().join('');
+        }
+
+        function showWinner() {
+            if (!replayData.ranking || replayData.ranking.length === 0) return;
+            const winnerRank = replayData.ranking[0];
+            const winnerPlayer = replayData.frames[totalFrames - 1].players[winnerRank.id];
+            winnerNameEl.textContent = `¡${winnerPlayer.name} es el Ganador!`;
+            winnerStatsEl.textContent = `Puntuación: ${winnerRank.score.toFixed(1)} pts · ${winnerRank.kills} kills · Puesto 1º`;
+            winnerOverlay.style.display = 'block';
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        btnPlayPause.addEventListener('click', togglePlayPause);
+
+        btnStepBack.addEventListener('click', () => {
+            pause();
+            currentFrameIdx = Math.max(0, currentFrameIdx - 60);
+            timelineScrubber.value = currentFrameIdx;
+            renderFrame(currentFrameIdx);
+        });
+
+        btnStepForward.addEventListener('click', () => {
+            pause();
+            currentFrameIdx = Math.min(totalFrames - 1, currentFrameIdx + 60);
+            timelineScrubber.value = currentFrameIdx;
+            renderFrame(currentFrameIdx);
+        });
+
+        timelineScrubber.addEventListener('input', (e) => {
+            pause();
+            currentFrameIdx = parseInt(e.target.value, 10);
+            renderFrame(currentFrameIdx);
+        });
+
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playbackSpeed = parseFloat(btn.dataset.speed);
+            });
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlayPause();
+            } else if (e.code === 'ArrowLeft') {
+                e.preventDefault();
+                pause();
+                currentFrameIdx = Math.max(0, currentFrameIdx - (e.shiftKey ? 1 : 60));
+                timelineScrubber.value = currentFrameIdx;
+                renderFrame(currentFrameIdx);
+            } else if (e.code === 'ArrowRight') {
+                e.preventDefault();
+                pause();
+                currentFrameIdx = Math.min(totalFrames - 1, currentFrameIdx + (e.shiftKey ? 1 : 60));
+                timelineScrubber.value = currentFrameIdx;
+                renderFrame(currentFrameIdx);
+            }
+        });
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.width * (H / W) * dpr);
+            if (frames.length > 0) {
+                renderFrame(currentFrameIdx);
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        initReplay();
+    })();
+</script>
+{% endblock %}

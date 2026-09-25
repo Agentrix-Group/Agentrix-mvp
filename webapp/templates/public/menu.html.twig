@@ -24,6 +24,14 @@
                     <a class="nav-link disabled"><i class="fas fa-book-open"></i> Problemset</a>
                 {% endif %}
             </li>
+            <li class="nav-item">
+                <a class="nav-link{% if current_route starts with 'agentrix_match' %} active{% endif %}"
+                   href="{{ path('agentrix_matches') }}"><i class="fas fa-robot"></i> Arena</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link{% if current_route == 'agentrix_ranking' %} active{% endif %}"
+                   href="{{ path('agentrix_ranking') }}"><i class="fas fa-trophy"></i> Ranking Arena</a>
+            </li>
 
             {% if is_granted('ROLE_TEAM') %}
                 <li class="nav-item">

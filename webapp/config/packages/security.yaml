@@ -82,4 +82,5 @@ security:
         - { path: ^/register, roles: PUBLIC_ACCESS }
         - { path: ^/public, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: PUBLIC_ACCESS }
+        - { path: ^/agentrix, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: IS_AUTHENTICATED_FULLY }

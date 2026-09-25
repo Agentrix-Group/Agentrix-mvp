@@ -1,0 +1,140 @@
+{% extends "agentrix/base.html.twig" %}
+
+{% block title %}Clasificación General - {{ parent() }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h1 class="mb-1">
+                <i class="fas fa-trophy text-warning me-2"></i> Clasificación Agentrix Arena
+            </h1>
+            <p class="text-muted mb-0">
+                Scoreboard oficial de bots autónomos &middot; Concurso: <strong>{{ contest ? contest.name : 'Sin concurso activo' }}</strong>
+                &middot; Partidas finalizadas: <span class="badge bg-success">{{ totalFinishedMatches }}</span>
+            </p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{{ path('agentrix_matches') }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-gamepad me-1"></i> Ver Partidas y Repeticiones
+            </a>
+        </div>
+    </div>
+
+    {# Scoring Rule Explanation #}
+    <div class="alert alert-info d-flex align-items-center py-2 px-3 mb-3">
+        <i class="fas fa-info-circle fs-4 me-3 text-info"></i>
+        <div class="small">
+            <strong>Fórmula Oficial de Puntuación:</strong>
+            Puntuación = <strong class="text-success">60 % Tiempo de Supervivencia</strong> + <strong class="text-primary">40 % Bajas de Jugadores (Kills)</strong>.
+            Criterios de desempate: Mayor número de bajas totales &gt; Mayor tiempo de supervivencia &gt; ID de equipo.
+        </div>
+    </div>
+
+    {% if availableRounds|length > 1 %}
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="text-muted small fw-bold"><i class="fas fa-filter"></i> FILTRAR POR RONDA:</span>
+            <div class="btn-group btn-group-sm">
+                <a href="{{ path('agentrix_ranking', {round: 'all'}) }}"
+                   class="btn {% if roundFilter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    Todas las Rondas
+                </a>
+                {% for r in availableRounds %}
+                    <a href="{{ path('agentrix_ranking', {round: r}) }}"
+                       class="btn {% if roundFilter == r ~ '' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                        Ronda {{ r }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    {# Ranking Table #}
+    <div class="card mb-4">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 80px; text-align: center;">Puesto</th>
+                        <th>Equipo</th>
+                        <th style="width: 100px; text-align: center;">Partidas</th>
+                        <th style="width: 100px; text-align: center;">Victorias</th>
+                        <th style="width: 100px; text-align: center;">Kills</th>
+                        <th style="width: 100px; text-align: center;">Mobs</th>
+                        <th style="width: 150px; text-align: center;">Supervivencia</th>
+                        <th style="width: 160px; text-align: right;">Puntos Totales</th>
+                        <th style="width: 120px; text-align: right;">Promedio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rankings %}
+                        <tr {% if row.rank == 1 %}class="table-warning"{% elseif row.rank == 2 %}class="table-light"{% elseif row.rank == 3 %}style="background-color: #fbf5f0;"{% endif %}>
+                            <td class="text-center align-middle">
+                                {% if row.rank == 1 %}
+                                    <span class="badge bg-warning text-dark fs-6 px-2 py-1 shadow-sm">🥇 1º</span>
+                                {% elseif row.rank == 2 %}
+                                    <span class="badge bg-secondary text-white fs-6 px-2 py-1 shadow-sm">🥈 2º</span>
+                                {% elseif row.rank == 3 %}
+                                    <span class="badge text-white fs-6 px-2 py-1 shadow-sm" style="background-color: #cd7f32;">🥉 3º</span>
+                                {% else %}
+                                    <span class="fw-bold text-muted fs-6">{{ row.rank }}º</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                <div class="fw-bold">{{ row.team_name }}</div>
+                                <div class="small text-muted">ID: {{ row.team_id }}</div>
+                            </td>
+                            <td class="text-center align-middle">
+                                <span class="badge text-bg-light border px-2 py-1">{{ row.matches_played }}</span>
+                            </td>
+                            <td class="text-center align-middle">
+                                {% if row.matches_won > 0 %}
+                                    <span class="badge bg-warning text-dark px-2 py-1 fw-bold">{{ row.matches_won }}</span>
+                                {% else %}
+                                    <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center align-middle">
+                                <span class="text-primary fw-bold fs-6">{{ row.total_kills }}</span>
+                            </td>
+                            <td class="text-center align-middle">
+                                <span class="text-muted">{{ row.total_mob_kills }}</span>
+                            </td>
+                            <td class="text-center align-middle">
+                                {% if row.matches_played > 0 %}
+                                    {% set avgTicks = (row.total_survival_ticks / row.matches_played)|round %}
+                                    {% set avgSec = (avgTicks / 60)|round(1) %}
+                                    <span class="text-success fw-semibold">{{ avgSec }}s</span>
+                                    <div class="small text-muted" style="font-size: 0.75rem;">{{ avgTicks }} ticks</div>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end align-middle">
+                                <div class="fs-5 fw-bold text-dark">{{ row.total_score|number_format(1) }}</div>
+                                <div class="progress" style="height: 4px; margin-top: 3px;" title="Contribución ponderada">
+                                    <div class="progress-bar bg-primary" style="width: 40%"></div>
+                                    <div class="progress-bar bg-success" style="width: 60%"></div>
+                                </div>
+                            </td>
+                            <td class="text-end align-middle">
+                                <span class="badge text-bg-primary px-2 py-1 fs-6">{{ row.avg_score|number_format(1) }}</span>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <i class="fas fa-trophy fa-3x mb-3 text-secondary d-block"></i>
+                                <h5>No hay puntuaciones registradas aún</h5>
+                                <p class="mb-0">
+                                    Las puntuaciones se calcularán automáticamente conforme finalicen las partidas de la arena.
+                                </p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

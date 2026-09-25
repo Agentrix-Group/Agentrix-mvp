@@ -79,6 +79,20 @@
                     <a class="nav-link{% if current_route == 'jury_scoreboard' %} active{% endif %}" href="{{ path('jury_scoreboard') }}"><i class="fas fa-list-ol"></i> scoreboard</a>
                 </li>
             {% endif %}
+
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle{% if current_route starts with 'agentrix_' %} active{% endif %}" href="#" id="navbarDropdownAgentrix" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-robot"></i> arena
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownAgentrix">
+                    <a class="dropdown-item {% if current_route starts with 'agentrix_match' %}active{% endif %}" href="{{ path('agentrix_matches') }}">
+                        <i class="fas fa-gamepad fa-fw"></i> partidas
+                    </a>
+                    <a class="dropdown-item {% if current_route == 'agentrix_ranking' %}active{% endif %}" href="{{ path('agentrix_ranking') }}">
+                        <i class="fas fa-trophy fa-fw"></i> ranking arena
+                    </a>
+                </div>
+            </li>
             {% if is_granted('ROLE_TEAM') %}
                 <li class="nav-item">
                     <a class="nav-link" target="_top" href="{{ path('team_index') }}"><i class="fas fa-arrow-right"></i> team</a>
